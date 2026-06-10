@@ -1,0 +1,11 @@
+# Python Virtual Environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local Uploads (Agar file surat uji coba tidak masuk GitHub)
+uploads/
+.env
