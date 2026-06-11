@@ -54,6 +54,7 @@ async def process_batch_task(
                     if not extracted_text.strip():
                         batch_status_dict[batch_id]["results"].append({
                             "file": os.path.basename(image_path),
+                            "file_url": f"/uploads/{os.path.basename(image_path)}",
                             "status": "success",
                             "data": None,
                             "message": "Tidak ada teks yang terdeteksi di gambar"
@@ -64,6 +65,7 @@ async def process_batch_task(
                         
                         batch_status_dict[batch_id]["results"].append({
                             "file": os.path.basename(image_path),
+                            "file_url": f"/uploads/{os.path.basename(image_path)}",
                             "status": "success",
                             "raw_text": extracted_text,
                             "parsed_data": parsed_data
@@ -77,13 +79,6 @@ async def process_batch_task(
                 finally:
                     # Update completed count
                     batch_status_dict[batch_id]["completed"] += 1
-                    
-                    # Clean up temporary image
-                    if os.path.exists(image_path):
-                        try:
-                            os.remove(image_path)
-                        except Exception:
-                            pass
             
             # Clean up original PDF file if it was split
             if is_pdf and os.path.exists(file_path):

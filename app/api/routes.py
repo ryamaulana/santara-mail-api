@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api")
 ocr_engine = OCREngine()
 llm_client = LLMClient()
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "../santara-mail-app/public/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Global dictionary untuk menyimpan status antrean batch
@@ -49,7 +49,12 @@ async def extract_surat(file: UploadFile = File(...)):
         extracted_text = raw_ocr_result
 
         if not extracted_text.strip():
-            return {"status": "success", "data": None, "message": "Tidak ada teks yang terdeteksi di gambar"}
+            return {
+                "status": "success", 
+                "data": None, 
+                "message": "Tidak ada teks yang terdeteksi di gambar",
+                "file_url": f"/uploads/{unique_filename}"
+            }
 
         # 3. Analisis dengan Llama 3
         parsed_data = await llm_client.parse_document(extracted_text)
@@ -58,15 +63,14 @@ async def extract_surat(file: UploadFile = File(...)):
             "status": "success",
             "message": "Dokumen berhasil diproses",
             "raw_text": extracted_text,
-            "parsed_data": parsed_data
+            "parsed_data": parsed_data,
+            "file_url": f"/uploads/{unique_filename}"
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Bersihkan file setelah selesai diproses agar storage tidak penuh
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        pass
 
 
 @router.post("/batch-extract")
