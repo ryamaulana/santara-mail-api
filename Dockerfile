@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
 # Create uploads directory inside container (will be mounted)
 RUN mkdir -p /app/uploads
