@@ -1,3 +1,8 @@
+import os
+# Disable oneDNN/MKLDNN to prevent PaddlePaddle 3.3.x crash on CPU
+os.environ["FLAGS_use_mkldnn"] = "0"
+os.environ["PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT"] = "0"
+
 from paddleocr import PaddleOCR
 import logging
 
