@@ -45,7 +45,7 @@ class OCREngine:
                     text = line[1][0]
                     extracted_text += text + "\n"
                     
-            logger.info("Berhasil mengekstrak teks dari gambar.")
+            logger.info(f"Berhasil mengekstrak teks dari gambar. Hasil OCR (100 char pertama): {extracted_text[:100]!r}")
             return extracted_text.strip()
             
         except Exception as e:
