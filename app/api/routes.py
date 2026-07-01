@@ -26,7 +26,7 @@ async def extract_surat(file: UploadFile = File(...)):
     Sistem akan membaca teks dengan OCR lalu merangkumnya menjadi JSON dengan LLM.
     """
     if not file.content_type.startswith("image/") and file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="File harus berupa gambar (JPEG/PNG) atau PDF")
+        raise HTTPException(status_code=400, detail="File harus berupa gambar (JPEG/PNG/WEBP) atau PDF")
 
     # 1. Simpan file gambar sementara
     file_extension = file.filename.split(".")[-1]
