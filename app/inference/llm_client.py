@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from groq import AsyncGroq
 from app.config import settings
 from app.inference.reply_templates import build_draf_balasan
@@ -49,16 +49,17 @@ ATURAN KETAT OUTPUT:
 3. JANGAN membungkus JSON dengan backticks Markdown. Langsung mulai dengan kurung kurawal '{' dan akhiri dengan '}'.
 """
 
-    async def parse_document(self, ocr_text: str) -> Dict[str, Any]:
+    async def parse_document(self, ocr_text: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Mengirim teks OCR ke Groq API untuk dianalisis dan diformat menjadi JSON.
         Fungsi ini bersifat asynchronous (async) agar tidak memblokir FastAPI.
-        
+
         Args:
             ocr_text (str): Teks mentah hasil pembacaan OCR.
-            
+
         Returns:
-            Dict[str, Any]: Data struktur JSON yang berisi informasi surat.
+            Tuple berisi (data surat hasil parse, info token usage dari Groq)
+            untuk keperluan pencatatan biaya per user di sisi Next.js.
         """
         system_prompt = self.get_system_prompt()
         
@@ -87,7 +88,7 @@ ATURAN KETAT OUTPUT:
             )
             
             response_text = chat_completion.choices[0].message.content
-            
+
             # Mengubah string JSON dari Groq menjadi objek Dictionary Python
             parsed_json = json.loads(response_text)
 
@@ -95,9 +96,16 @@ ATURAN KETAT OUTPUT:
             # (model tidak lagi menulis paragraf penuh — lihat get_system_prompt()).
             parsed_json["draf_balasan"] = build_draf_balasan(parsed_json)
 
+            usage = chat_completion.usage
+            usage_info = {
+                "model": self.model,
+                "input_tokens": usage.prompt_tokens if usage else 0,
+                "output_tokens": usage.completion_tokens if usage else 0,
+            }
+
             logger.info("Berhasil memproses respons JSON dari Groq API.")
-            return parsed_json
-                
+            return parsed_json, usage_info
+
         except json.JSONDecodeError as e:
             logger.error(f"Gagal menerjemahkan respons Groq ke JSON. Respons mentah: {response_text}")
             raise Exception("Model tidak mengembalikan format JSON yang valid.")

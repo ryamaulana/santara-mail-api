@@ -61,14 +61,15 @@ async def process_batch_task(
                         })
                     else:
                         # 2. LLM Parsing
-                        parsed_data = await llm_client.parse_document(extracted_text)
-                        
+                        parsed_data, usage = await llm_client.parse_document(extracted_text)
+
                         batch_status_dict[batch_id]["results"].append({
                             "file": os.path.basename(image_path),
                             "file_url": f"/uploads/{os.path.basename(image_path)}",
                             "status": "success",
                             "raw_text": extracted_text,
-                            "parsed_data": parsed_data
+                            "parsed_data": parsed_data,
+                            "usage": usage
                         })
                 except Exception as e:
                     batch_status_dict[batch_id]["results"].append({
