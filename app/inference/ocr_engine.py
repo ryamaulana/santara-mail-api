@@ -6,8 +6,6 @@ os.environ["PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT"] = "0"
 from paddleocr import PaddleOCR
 import logging
 
-# Konfigurasi logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class OCREngine:
@@ -45,7 +43,7 @@ class OCREngine:
                     text = line[1][0]
                     extracted_text += text + "\n"
                     
-            logger.info(f"Berhasil mengekstrak teks dari gambar. Hasil OCR (100 char pertama): {extracted_text[:100]!r}")
+            logger.info(f"Berhasil mengekstrak teks dari gambar ({len(extracted_text)} karakter).")
             return extracted_text.strip()
             
         except Exception as e:

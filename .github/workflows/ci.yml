@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # PaddleOCR/PaddlePaddle are large ML deps not worth installing in CI
+      # just for a syntax/style check — this validates the code compiles and
+      # follows basic lint rules without pulling in the heavy runtime deps.
+      - run: pip install ruff
+
+      - run: python -m compileall -q app
+
+      - run: ruff check app

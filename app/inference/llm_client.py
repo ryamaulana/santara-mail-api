@@ -106,8 +106,8 @@ ATURAN KETAT OUTPUT:
             logger.info("Berhasil memproses respons JSON dari Groq API.")
             return parsed_json, usage_info
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Gagal menerjemahkan respons Groq ke JSON. Respons mentah: {response_text}")
+        except json.JSONDecodeError:
+            logger.error(f"Gagal menerjemahkan respons Groq ke JSON (panjang respons: {len(response_text)} karakter).")
             raise Exception("Model tidak mengembalikan format JSON yang valid.")
         except Exception as e:
             logger.error(f"Terjadi kesalahan tak terduga: {e}")

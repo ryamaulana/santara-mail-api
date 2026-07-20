@@ -1,16 +1,16 @@
 import os
-import asyncio
 from app.inference.ocr_engine import OCREngine
 from app.inference.llm_client import LLMClient
 from app.inference.pdf_splitter import split_pdf_to_images
 
 async def process_batch_task(
-    batch_id: str, 
-    file_paths: list[str], 
-    batch_status_dict: dict, 
+    batch_id: str,
+    file_paths: list[str],
+    batch_status_dict: dict,
     upload_dir: str,
     ocr_engine: OCREngine,
-    llm_client: LLMClient
+    llm_client: LLMClient,
+    max_pdf_pages: int | None = None
 ):
     """
     Fungsi worker asinkron untuk memproses antrean file di latar belakang.
@@ -28,7 +28,7 @@ async def process_batch_task(
             if is_pdf:
                 try:
                     # Split PDF into images
-                    pdf_images = split_pdf_to_images(file_path, upload_dir)
+                    pdf_images = split_pdf_to_images(file_path, upload_dir, max_pdf_pages)
                     images_to_process.extend(pdf_images)
                     
                     # Update total in status to reflect multiple pages
