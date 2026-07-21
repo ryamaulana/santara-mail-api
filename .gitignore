@@ -6,6 +6,7 @@ venv/
 __pycache__/
 *.pyc
 
-# Local Uploads (Agar file surat uji coba tidak masuk GitHub)
+# Local document storage (Agar file surat uji coba tidak masuk GitHub)
 uploads/
+storage/
 .env

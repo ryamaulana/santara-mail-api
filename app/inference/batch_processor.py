@@ -7,7 +7,8 @@ async def process_batch_task(
     batch_id: str,
     file_paths: list[str],
     batch_status_dict: dict,
-    upload_dir: str,
+    user_dir: str,
+    user_id: str,
     ocr_engine: OCREngine,
     llm_client: LLMClient,
     max_pdf_pages: int | None = None
@@ -27,8 +28,8 @@ async def process_batch_task(
             images_to_process = []
             if is_pdf:
                 try:
-                    # Split PDF into images
-                    pdf_images = split_pdf_to_images(file_path, upload_dir, max_pdf_pages)
+                    # Split PDF into images (disimpan di folder milik user yang sama)
+                    pdf_images = split_pdf_to_images(file_path, user_dir, max_pdf_pages)
                     images_to_process.extend(pdf_images)
                     
                     # Update total in status to reflect multiple pages
@@ -54,7 +55,7 @@ async def process_batch_task(
                     if not extracted_text.strip():
                         batch_status_dict[batch_id]["results"].append({
                             "file": os.path.basename(image_path),
-                            "file_url": f"/uploads/{os.path.basename(image_path)}",
+                            "file_url": f"{user_id}/{os.path.basename(image_path)}",
                             "status": "success",
                             "data": None,
                             "message": "Tidak ada teks yang terdeteksi di gambar"
@@ -65,7 +66,7 @@ async def process_batch_task(
 
                         batch_status_dict[batch_id]["results"].append({
                             "file": os.path.basename(image_path),
-                            "file_url": f"/uploads/{os.path.basename(image_path)}",
+                            "file_url": f"{user_id}/{os.path.basename(image_path)}",
                             "status": "success",
                             "raw_text": extracted_text,
                             "parsed_data": parsed_data,

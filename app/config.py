@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     # subject to CORS at all). Defaults to no cross-origin access.
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
 
+    # Root direktori tempat dokumen surat disimpan, di-mount dari disk host
+    # (lihat docker-compose.yml) — TIDAK di dalam folder public Next.js, karena
+    # dokumen ini sensitif dan hanya boleh diserve lewat endpoint /api/files/*
+    # yang dijaga require_internal_api_key + otorisasi kepemilikan di Next.js.
+    DOCUMENTS_DIR: str = os.getenv("DOCUMENTS_DIR", "./storage/documents")
+
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "30"))
     MAX_PDF_PAGES: int = int(os.getenv("MAX_PDF_PAGES", "50"))
     MAX_BATCH_FILES: int = int(os.getenv("MAX_BATCH_FILES", "30"))
