@@ -1,7 +1,109 @@
+import logging
 import os
 from app.inference.ocr_engine import OCREngine
 from app.inference.llm_client import LLMClient
 from app.inference.pdf_splitter import split_pdf_to_images
+
+logger = logging.getLogger(__name__)
+
+
+async def _process_pdf(file_path, batch_id, batch_status_dict, user_dir, user_id, ocr_engine, llm_client, max_pdf_pages):
+    """Satu PDF (berapapun jumlah halamannya) diperlakukan sebagai SATU dokumen:
+    semua halaman di-OCR lalu teksnya digabung sebelum dikirim ke LLM sekali saja,
+    supaya hasilnya jadi satu entri, bukan pecah per halaman."""
+    try:
+        pdf_images = split_pdf_to_images(file_path, user_dir, max_pdf_pages)
+    except Exception as e:
+        batch_status_dict[batch_id]["results"].append({
+            "file": os.path.basename(file_path),
+            "status": "error",
+            "message": f"Gagal membaca PDF: {str(e)}"
+        })
+        batch_status_dict[batch_id]["completed"] += 1
+        return
+
+    page_texts = []
+    for image_path in pdf_images:
+        try:
+            text = ocr_engine.extract_text(image_path)
+            if text.strip():
+                page_texts.append(text.strip())
+        except Exception:
+            logger.exception("Gagal OCR salah satu halaman PDF %s", file_path)
+
+    # Semua halaman disimpan agar bisa dilihat satu per satu di frontend,
+    # bukan cuma halaman pertama.
+    page_urls = [f"{user_id}/{os.path.basename(p)}" for p in pdf_images]
+    first_page_url = page_urls[0] if page_urls else None
+    # PDF asli juga disimpan (tidak dihapus) supaya bisa diunduh utuh lagi nanti
+    # dari halaman Surat Masuk — bukan cuma pratinjau halaman pertama.
+    original_file_url = f"{user_id}/{os.path.basename(file_path)}"
+    combined_text = "\n\n".join(page_texts)
+
+    try:
+        if not combined_text.strip():
+            batch_status_dict[batch_id]["results"].append({
+                "file": os.path.basename(file_path),
+                "file_url": first_page_url,
+                "page_urls": page_urls,
+                "original_file_url": original_file_url,
+                "status": "success",
+                "data": None,
+                "message": "Tidak ada teks yang terdeteksi di dokumen"
+            })
+        else:
+            parsed_data, usage = await llm_client.parse_document(combined_text)
+            batch_status_dict[batch_id]["results"].append({
+                "file": os.path.basename(file_path),
+                "file_url": first_page_url,
+                "page_urls": page_urls,
+                "original_file_url": original_file_url,
+                "status": "success",
+                "raw_text": combined_text,
+                "parsed_data": parsed_data,
+                "usage": usage
+            })
+    except Exception as e:
+        batch_status_dict[batch_id]["results"].append({
+            "file": os.path.basename(file_path),
+            "status": "error",
+            "message": str(e)
+        })
+    finally:
+        batch_status_dict[batch_id]["completed"] += 1
+
+
+async def _process_image(file_path, batch_id, batch_status_dict, user_id, ocr_engine, llm_client):
+    try:
+        extracted_text = ocr_engine.extract_text(file_path)
+
+        if not extracted_text.strip():
+            batch_status_dict[batch_id]["results"].append({
+                "file": os.path.basename(file_path),
+                "file_url": f"{user_id}/{os.path.basename(file_path)}",
+                "status": "success",
+                "data": None,
+                "message": "Tidak ada teks yang terdeteksi di gambar"
+            })
+        else:
+            parsed_data, usage = await llm_client.parse_document(extracted_text)
+            batch_status_dict[batch_id]["results"].append({
+                "file": os.path.basename(file_path),
+                "file_url": f"{user_id}/{os.path.basename(file_path)}",
+                "status": "success",
+                "raw_text": extracted_text,
+                "parsed_data": parsed_data,
+                "usage": usage
+            })
+    except Exception as e:
+        batch_status_dict[batch_id]["results"].append({
+            "file": os.path.basename(file_path),
+            "status": "error",
+            "message": str(e)
+        })
+    finally:
+        batch_status_dict[batch_id]["completed"] += 1
+
 
 async def process_batch_task(
     batch_id: str,
@@ -16,78 +118,18 @@ async def process_batch_task(
     """
     Fungsi worker asinkron untuk memproses antrean file di latar belakang.
     Menerima list of file paths (gambar atau PDF), mengekstrak teks, dan memanggil LLM.
+    Setiap file asli (termasuk PDF multi-halaman) menghasilkan tepat satu entri hasil.
     """
     try:
-        # Update total file (ini belum termasuk pemisahan PDF menjadi halaman, 
-        # kita akan hitung setiap file asli sebagai 1 entitas, atau bisa juga update total jika file itu PDF)
-        
         for file_path in file_paths:
-            # Periksa apakah file adalah PDF
             is_pdf = file_path.lower().endswith(".pdf")
-            
-            images_to_process = []
-            if is_pdf:
-                try:
-                    # Split PDF into images (disimpan di folder milik user yang sama)
-                    pdf_images = split_pdf_to_images(file_path, user_dir, max_pdf_pages)
-                    images_to_process.extend(pdf_images)
-                    
-                    # Update total in status to reflect multiple pages
-                    # Subtract 1 for the original PDF, add the number of pages
-                    batch_status_dict[batch_id]["total"] += (len(pdf_images) - 1)
-                except Exception as e:
-                    batch_status_dict[batch_id]["results"].append({
-                        "file": os.path.basename(file_path),
-                        "status": "error",
-                        "message": f"Gagal membaca PDF: {str(e)}"
-                    })
-                    batch_status_dict[batch_id]["completed"] += 1
-                    continue
-            else:
-                images_to_process.append(file_path)
-            
-            # Proses setiap gambar (bisa dari file gambar asli atau halaman PDF)
-            for image_path in images_to_process:
-                try:
-                    # 1. OCR
-                    extracted_text = ocr_engine.extract_text(image_path)
-                    
-                    if not extracted_text.strip():
-                        batch_status_dict[batch_id]["results"].append({
-                            "file": os.path.basename(image_path),
-                            "file_url": f"{user_id}/{os.path.basename(image_path)}",
-                            "status": "success",
-                            "data": None,
-                            "message": "Tidak ada teks yang terdeteksi di gambar"
-                        })
-                    else:
-                        # 2. LLM Parsing
-                        parsed_data, usage = await llm_client.parse_document(extracted_text)
 
-                        batch_status_dict[batch_id]["results"].append({
-                            "file": os.path.basename(image_path),
-                            "file_url": f"{user_id}/{os.path.basename(image_path)}",
-                            "status": "success",
-                            "raw_text": extracted_text,
-                            "parsed_data": parsed_data,
-                            "usage": usage
-                        })
-                except Exception as e:
-                    batch_status_dict[batch_id]["results"].append({
-                        "file": os.path.basename(image_path),
-                        "status": "error",
-                        "message": str(e)
-                    })
-                finally:
-                    # Update completed count
-                    batch_status_dict[batch_id]["completed"] += 1
-            
-            # Clean up original PDF file if it was split
-            if is_pdf and os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                except Exception:
-                    pass
+            if is_pdf:
+                # PDF asli sengaja tidak dihapus (lihat _process_pdf) agar bisa
+                # diunduh utuh lagi nanti dari halaman Surat Masuk.
+                await _process_pdf(file_path, batch_id, batch_status_dict, user_dir, user_id, ocr_engine, llm_client, max_pdf_pages)
+            else:
+                await _process_image(file_path, batch_id, batch_status_dict, user_id, ocr_engine, llm_client)
 
         # Tandai selesai
         batch_status_dict[batch_id]["status"] = "completed"

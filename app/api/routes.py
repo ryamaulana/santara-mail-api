@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends, Request, Query
 from fastapi.responses import FileResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -165,6 +165,7 @@ async def batch_extract(
         "results": [],
         "error": None,
         "created_at": time.time(),
+        "user_id": user_id,
     }
 
     background_tasks.add_task(
@@ -184,14 +185,22 @@ async def batch_extract(
 
 @router.get("/batch-status/{batch_id}")
 @limiter.limit("60/minute")
-async def get_batch_status(request: Request, batch_id: str):
+async def get_batch_status(request: Request, batch_id: str, user_id: str = Query(...)):
     """
     Endpoint untuk mengecek status dan hasil dari antrean batch.
+
+    `user_id` di sini diklaim oleh Next.js berdasarkan sesi login yang sudah
+    diverifikasi di sana — dicocokkan ke pemilik asli batch ini (disimpan saat
+    /batch-extract dipanggil) supaya satu user tidak bisa lihat hasil OCR
+    batch milik user lain hanya dengan menebak/memperoleh batch_id-nya.
     """
-    if batch_id not in BATCH_STATUS:
+    entry = BATCH_STATUS.get(batch_id)
+    if entry is None or entry.get("user_id") != user_id:
+        # 404 (bukan 403) sengaja dipakai supaya tidak membocorkan informasi
+        # "batch ini sebenarnya ada tapi punya orang lain" ke yang nebak-nebak id.
         raise HTTPException(status_code=404, detail="Batch ID tidak ditemukan")
 
-    return BATCH_STATUS[batch_id]
+    return entry
 
 
 @router.get("/files/{user_id}/{filename}")

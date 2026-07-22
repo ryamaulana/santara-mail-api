@@ -1,8 +1,14 @@
 from pydantic_settings import BaseSettings
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Satu-satunya .env yang dipakai ada di root repo (satu tingkat di atas
+# santara-mail-api/ DAN santara-mail-app/), bukan di folder ini — supaya
+# tidak ada dua salinan config yang bisa beda nilai. Dipakai juga oleh
+# docker-compose.yml lewat env_file/environment di root yang sama.
+_ROOT_ENV = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=_ROOT_ENV)
 
 class Settings(BaseSettings):
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
